@@ -49,6 +49,7 @@ impl Vote {
 
         let row = row?;
         let position: String = row.get(4);
+        println!("position: {}", position);
         let candidature = Candidature {
             id: row.get(0),
             party_id: row.get(1),
@@ -146,10 +147,6 @@ impl Vote {
             year: current_year,
             created_at: chrono::Utc::now(),
         };
-
-        println!("{:?}", vote);
-
-        // insert vote
 
         Ok(vote)
     }
