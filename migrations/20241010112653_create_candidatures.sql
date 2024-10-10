@@ -29,3 +29,5 @@ CREATE TABLE candidatures (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX idx_candidatures_code ON candidatures(code);

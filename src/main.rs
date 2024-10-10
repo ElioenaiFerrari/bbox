@@ -6,6 +6,8 @@ use actix_web::{
 use actix_ws::AggregatedMessage;
 use bbox::{Candidate, Candidature, CandidaturePosition, Party, Vote, Voter};
 use dotenv::dotenv;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use tokio_stream::StreamExt;
@@ -38,6 +40,10 @@ async fn ws(
     state: Data<State>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
+
+    let candidatures = Candidature::list(&state.conn).await.unwrap();
+    let value = serde_json::to_string(&candidatures).unwrap();
+    session.text(value).await.unwrap();
 
     let mut stream = stream
         .aggregate_continuations()
@@ -106,6 +112,14 @@ struct State {
     pub conn: SqlitePool,
 }
 
+fn generate_random_string(length: usize) -> String {
+    let mut rng = thread_rng();
+    (0..length)
+        .map(|_| rng.sample(Alphanumeric)) // Generate random alphanumeric characters
+        .map(char::from) // Convert bytes to char
+        .collect() // Collect into a String
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
@@ -133,11 +147,12 @@ async fn main() -> std::io::Result<()> {
         println!("error on create candidate: {}", reason);
     }
 
+    // use rng
     let candidature = Candidature {
         id: Uuid::now_v7().to_string(),
         party_id: party.id,
         candidate_id: candidate.id,
-        code: Uuid::now_v7().to_string().chars().take(4).collect(),
+        code: generate_random_string(8),
         position: CandidaturePosition::President,
     };
     if let Err(reason) = candidature.create(&conn).await {
@@ -156,7 +171,10 @@ async fn main() -> std::io::Result<()> {
         println!("error on create voter: {}", reason);
     }
 
-    println!("voter created: {}", voter.id);
+    println!(
+        "voter created: {}, candidature created: {}",
+        voter.id, candidature.code
+    );
 
     // let vote = Vote::build(&conn, voter.id, candidature.code).await?;
 

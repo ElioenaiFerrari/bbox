@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, SqlitePool};
+use sqlx::{FromRow, Row, SqlitePool};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -99,5 +99,38 @@ impl Candidature {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn list<'a>(conn: &'a SqlitePool) -> Result<Vec<Candidature>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                party_id,
+                candidate_id,
+                code,
+                position
+            FROM
+                candidatures
+            "#,
+        )
+        .fetch_all(conn)
+        .await?;
+
+        let mut cs = Vec::new();
+
+        for row in rows {
+            let position: String = row.get(4);
+            let c = Candidature {
+                id: row.get(0),
+                party_id: row.get(1),
+                candidate_id: row.get(2),
+                code: row.get(3),
+                position: CandidaturePosition::from(position),
+            };
+            cs.push(c);
+        }
+
+        Ok(cs)
     }
 }

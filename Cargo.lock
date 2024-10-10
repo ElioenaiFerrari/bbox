@@ -345,6 +345,7 @@ dependencies = [
  "dotenv",
  "hex",
  "hmac",
+ "rand",
  "serde",
  "serde_json",
  "sha2",
