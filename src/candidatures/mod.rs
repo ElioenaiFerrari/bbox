@@ -21,20 +21,20 @@ pub enum CandidaturePosition {
 impl ToString for CandidaturePosition {
     fn to_string(&self) -> String {
         match self {
-            CandidaturePosition::President => "Presidente".to_string(),
-            CandidaturePosition::VicePresident => "Vice-Presidente".to_string(),
-            CandidaturePosition::Governor => "Governador".to_string(),
-            CandidaturePosition::ViceGovernor => "Vice-Governador".to_string(),
-            CandidaturePosition::Senator => "Senador".to_string(),
-            CandidaturePosition::FederalDeputy => "Deputado Federal".to_string(),
-            CandidaturePosition::StateDeputy => "Deputado Estadual".to_string(),
-            CandidaturePosition::Mayor => "Prefeito".to_string(),
-            CandidaturePosition::ViceMayor => "Vice-Prefeito".to_string(),
-            CandidaturePosition::Councilor => "Vereador".to_string(),
-            CandidaturePosition::Minister => "Ministro".to_string(),
-            CandidaturePosition::Secretary => "Secretário".to_string(),
+            CandidaturePosition::President => "presidente".to_string(),
+            CandidaturePosition::VicePresident => "vice-presidente".to_string(),
+            CandidaturePosition::Governor => "governador".to_string(),
+            CandidaturePosition::ViceGovernor => "vice-governador".to_string(),
+            CandidaturePosition::Senator => "senador".to_string(),
+            CandidaturePosition::FederalDeputy => "deputado federal".to_string(),
+            CandidaturePosition::StateDeputy => "deputado estadual".to_string(),
+            CandidaturePosition::Mayor => "prefeito".to_string(),
+            CandidaturePosition::ViceMayor => "vice-prefeito".to_string(),
+            CandidaturePosition::Councilor => "vereador".to_string(),
+            CandidaturePosition::Minister => "ministro".to_string(),
+            CandidaturePosition::Secretary => "secretário".to_string(),
             #[allow(unreachable_patterns)]
-            _ => "Vereador".to_string(),
+            _ => "vereador".to_string(),
         }
     }
 }

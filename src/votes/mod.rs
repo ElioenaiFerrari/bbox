@@ -32,7 +32,8 @@ impl Vote {
                 id,
                 party_id,
                 candidate_id,
-                code
+                code,
+                position
             FROM
                 candidatures WHERE code = ?
             "#,
@@ -46,12 +47,13 @@ impl Vote {
         }
 
         let row = row?;
+        let position: String = row.get(4);
         let candidature = Candidature {
             id: row.get(0),
             party_id: row.get(1),
             candidate_id: row.get(2),
             code: row.get(3),
-            position: CandidaturePosition::Councilor,
+            position: CandidaturePosition::from(position),
         };
 
         let current_year = chrono::Utc::now().year();
