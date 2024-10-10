@@ -22,8 +22,8 @@
 -- }
 CREATE TABLE candidatures (
   id UUID PRIMARY KEY,
-  party_id UUID NOT NULL,
-  candidate_id UUID NOT NULL,
+  party_id UUID REFERENCES parties(id),
+  candidate_id UUID REFERENCES candidates(id),
   code VARCHAR(10) NOT NULL,
   position VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
