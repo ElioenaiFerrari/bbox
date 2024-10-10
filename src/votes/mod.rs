@@ -17,6 +17,7 @@ pub struct Vote {
     pub candidature_position: CandidaturePosition,
     pub hash: String,
     pub previous_hash: String,
+    pub year: i32,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -55,9 +56,7 @@ impl Vote {
             code: row.get(3),
             position: CandidaturePosition::from(position),
         };
-
         let current_year = chrono::Utc::now().year();
-        // check if has vote for this position in this year
         let row = sqlx::query(
             r#"
             SELECT
@@ -65,12 +64,15 @@ impl Vote {
                 voter_id,
                 candidature_id,
                 hash,
+                year,
                 previous_hash,
                 created_at
             FROM
-                votes WHERE voter_id = ? AND
+                votes
+            WHERE
+                voter_id = ? AND
                 candidature_position = ? AND
-                strftime('%Y', created_at) = ?
+                year = ?
             "#,
         )
         .bind(&voter_id)
@@ -86,8 +88,9 @@ impl Vote {
                 candidature_id: row.get(2),
                 candidature_position: CandidaturePosition::Councilor,
                 hash: row.get(3),
-                previous_hash: row.get(4),
-                created_at: row.get(5),
+                year: row.get(4),
+                previous_hash: row.get(5),
+                created_at: row.get(6),
             });
         }
 
@@ -119,6 +122,7 @@ impl Vote {
             hash: row.get(3),
             previous_hash: row.get(4),
             created_at: row.get(5),
+            year: 0,
         };
 
         let secret_key = env::var("SECRET_KEY").expect("SECRET_KEY must be set");
@@ -126,21 +130,26 @@ impl Vote {
         mac.update(voter_id.as_bytes());
         mac.update(candidature.id.as_bytes());
         mac.update(last_vote.hash.as_bytes());
+        mac.update(last_vote.created_at.to_string().as_bytes());
 
         let result = mac.finalize();
         let code_bytes = result.into_bytes();
-        let code = hex::encode(code_bytes);
+        let hash = hex::encode(code_bytes);
 
-        // insert vote
         let vote = Vote {
             id: Uuid::now_v7().to_string(),
             voter_id,
             candidature_id: candidature.id,
             candidature_position: candidature.position,
-            hash: code,
+            hash,
             previous_hash: last_vote.hash,
+            year: current_year,
             created_at: chrono::Utc::now(),
         };
+
+        println!("{:?}", vote);
+
+        // insert vote
 
         Ok(vote)
     }
@@ -148,8 +157,8 @@ impl Vote {
     pub async fn create<'a>(&self, conn: &'a SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO votes (id, voter_id, candidature_id, candidature_position, hash, previous_hash, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO votes (id, voter_id, candidature_id, candidature_position, hash, previous_hash, year, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&self.id)
@@ -158,6 +167,7 @@ impl Vote {
         .bind(&self.candidature_position.to_string())
         .bind(&self.hash)
         .bind(&self.previous_hash)
+        .bind(&self.year)
         .bind(&self.created_at)
         .execute(conn)
         .await?;
