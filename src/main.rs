@@ -109,16 +109,16 @@ async fn ws(
     state: Data<State>,
     query: Query<VoteQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
+    let (res, mut session, _stream) = actix_ws::handle(&req, stream)?;
 
     // let candidatures = Candidature::list(&state.conn).await.unwrap();
     // let value = serde_json::to_string(&candidatures).unwrap();
     // session.text(value).await.unwrap();
 
-    let mut stream = stream
-        .aggregate_continuations()
-        // aggregate continuation frames up to 1MiB
-        .max_continuation_size(2_usize.pow(20));
+    // let mut stream = stream
+    // .aggregate_continuations()
+    // // aggregate continuation frames up to 1MiB
+    // .max_continuation_size(2_usize.pow(20));
 
     // start task but don't wait for it
     rt::spawn(async move {
