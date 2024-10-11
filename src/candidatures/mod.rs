@@ -1,22 +1,35 @@
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sqlx::{FromRow, Row, SqlitePool};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CandidaturePosition {
+    #[serde(rename = "Presidente")]
     President,
+    #[serde(rename = "Vice-Presidente")]
     VicePresident,
+    #[serde(rename = "Governador")]
     Governor,
+    #[serde(rename = "Vice-Governador")]
     ViceGovernor,
+    #[serde(rename = "Senador")]
     Senator,
-    FederalDeputy, // Representa deputados federais
-    StateDeputy,   // Representa deputados estaduais
+    #[serde(rename = "Deputado Federal")]
+    FederalDeputy,
+    #[serde(rename = "Deputado Estadual")]
+    StateDeputy,
+    #[serde(rename = "Prefeito")]
     Mayor,
+    #[serde(rename = "Vice-Prefeito")]
     ViceMayor,
-    Councilor, // Substitui Councilman e Councilwoman, Alderman e Alderwoman
-    Minister,  // Representa ministros
-    Secretary, // Representa secretários (por exemplo, de estado)
+    #[serde(rename = "Vereador")]
+    Councilor,
+    #[serde(rename = "Ministro")]
+    Minister,
+    #[serde(rename = "Secretário")]
+    Secretary,
 }
 
 impl ToString for CandidaturePosition {
@@ -63,6 +76,7 @@ pub struct Candidature {
     pub id: String,
     pub party_id: String,
     pub candidate_id: String,
+    pub image_url: String,
     pub code: String,
     pub year: i32,
     pub position: CandidaturePosition,
@@ -74,6 +88,7 @@ impl Candidature {
         candidate_id: String,
         code: String,
         position: CandidaturePosition,
+        image_url: String,
     ) -> Candidature {
         let current_year = chrono::Local::now().year();
         Candidature {
@@ -82,6 +97,7 @@ impl Candidature {
             candidate_id,
             code,
             position,
+            image_url,
             year: current_year,
         }
     }
@@ -107,19 +123,29 @@ impl Candidature {
     pub async fn list<'a>(
         conn: &'a SqlitePool,
         position: CandidaturePosition,
-    ) -> Result<Vec<Candidature>, sqlx::Error> {
+    ) -> Result<Vec<Value>, sqlx::Error> {
         let current_year = chrono::Local::now().year();
         let rows = sqlx::query(
             r#"
             SELECT
-                id,
-                party_id,
-                candidate_id,
-                code,
-                position,
-                year
+                cu.id,
+                cu.party_id,
+                cu.candidate_id,
+                cu.code,
+                cu.position,
+                cu.year,
+                cu.image_url,
+                p.name,
+                p.acronym,
+                p.name,
+                ca.first_name,
+                ca.last_name
             FROM
-                candidatures
+                candidatures cu
+            JOIN
+                parties p ON p.id = cu.party_id
+            JOIN
+                candidates ca ON ca.id = cu.candidate_id
             WHERE
                 position = ? AND
                 year = ?
@@ -131,18 +157,29 @@ impl Candidature {
         .await?;
 
         let mut cs = Vec::new();
-
         for row in rows {
-            let position: String = row.get(4);
-            let c = Candidature {
-                id: row.get(0),
-                party_id: row.get(1),
-                candidate_id: row.get(2),
-                code: row.get(3),
-                position: CandidaturePosition::from(position),
-                year: row.get(5),
-            };
-            cs.push(c);
+            let value = json!({
+                "candidature": {
+                    "id": row.get::<String, usize>(0),
+                    "party_id": row.get::<String, usize>(1),
+                    "candidate_id": row.get::<String, usize>(2),
+                    "code": row.get::<String, usize>(3),
+                    "position": row.get::<String, usize>(4),
+                    "year": row.get::<i32, _>(5),
+                    "image_url": row.get::<String, usize>(6),
+                },
+                "party": {
+                    "name": row.get::<String, usize>(7),
+                    "acronym": row.get::<String, usize>(8),
+                },
+                "candidate": {
+                    "first_name": row.get::<String, usize>(9),
+                    "last_name": row.get::<String, usize>(10),
+
+                },
+            });
+
+            cs.push(value);
         }
 
         Ok(cs)

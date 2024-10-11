@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{
     get, rt,
     web::{self, Data, Query},
@@ -171,35 +172,75 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to connect to database");
 
-    let party = Party {
+    let party1 = Party {
         id: Uuid::now_v7().to_string(),
-        name: "Partido da Causa Operária".to_string(),
-        description: "Partido da Causa Operária".to_string(),
-        acronym: "PCO".to_string(),
+        name: "Partido Social Democrático".to_string(),
+        description: "Partido Social Democrático".to_string(),
+        acronym: "PSD".to_string(),
     };
-    if let Err(reason) = party.create(&conn).await {
+
+    let party2 = Party {
+        id: Uuid::now_v7().to_string(),
+        name: "Partido Comunista Brasileiro".to_string(),
+        description: "Partido Comunista Brasileiro".to_string(),
+        acronym: "PCB".to_string(),
+    };
+
+    if let Err(reason) = party1.create(&conn).await {
         println!("error on create party: {}", reason);
     }
 
-    let candidate = Candidate {
+    if let Err(reason) = party2.create(&conn).await {
+        println!("error on create party: {}", reason);
+    }
+
+    let candidate1 = Candidate {
         id: Uuid::now_v7().to_string(),
-        first_name: "José".to_string(),
+        first_name: "João".to_string(),
         last_name: "Silva".to_string(),
     };
-    if let Err(reason) = candidate.create(&conn).await {
+
+    let candidate2 = Candidate {
+        id: Uuid::now_v7().to_string(),
+        first_name: "Maria".to_string(),
+        last_name: "Silva".to_string(),
+    };
+
+    if let Err(reason) = candidate1.create(&conn).await {
+        println!("error on create candidate: {}", reason);
+    }
+
+    if let Err(reason) = candidate2.create(&conn).await {
         println!("error on create candidate: {}", reason);
     }
 
     // use rng
-    let candidature = Candidature {
+    let candidature1 = Candidature {
         id: Uuid::now_v7().to_string(),
-        party_id: party.id,
-        candidate_id: candidate.id,
+        party_id: party1.id,
+        candidate_id: candidate1.id,
+        image_url: "https://media.gazetadopovo.com.br/2024/07/23194251/Jair-Bolsonaro-Arquivo-Carolina-Antunes-PR-960x540.jpg".to_string(),
         code: generate_random_string(8),
         position: CandidaturePosition::President,
         year: chrono::Utc::now().year(),
     };
-    if let Err(reason) = candidature.create(&conn).await {
+
+    let candidature2 = Candidature {
+        id: Uuid::now_v7().to_string(),
+        party_id: party2.id,
+        candidate_id: candidate2.id,
+        image_url: "https://static.poder360.com.br/2024/10/lula-entrevista-fortaleza-848x477.png"
+            .to_string(),
+        code: generate_random_string(8),
+        position: CandidaturePosition::President,
+        year: chrono::Utc::now().year(),
+    };
+
+    if let Err(reason) = candidature1.create(&conn).await {
+        println!("error on create candidature: {}", reason);
+    }
+
+    if let Err(reason) = candidature2.create(&conn).await {
         println!("error on create candidature: {}", reason);
     }
 
@@ -215,17 +256,18 @@ async fn main() -> std::io::Result<()> {
         println!("error on create voter: {}", reason);
     }
 
-    println!(
-        "voter created: {}, candidature created: {}",
-        voter.id, candidature.code
-    );
-
     // let vote = Vote::build(&conn, voter.id, candidature.code).await?;
 
     // vote.create(&conn).await?;
 
     HttpServer::new(move || {
         App::new()
+            .wrap(
+                Cors::default()
+                    .allow_any_header()
+                    .allow_any_method()
+                    .allow_any_origin(),
+            )
             .app_data(Data::new(State { conn: conn.clone() }))
             .service(ws)
             .service(

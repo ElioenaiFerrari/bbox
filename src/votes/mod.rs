@@ -38,7 +38,8 @@ impl Vote {
                 candidate_id,
                 code,
                 position,
-                year
+                year,
+                image_url
             FROM
                 candidatures WHERE code = ? AND
                 position = ?
@@ -61,6 +62,7 @@ impl Vote {
             code: row.get(3),
             position: candidature_position,
             year: row.get(5),
+            image_url: row.get(6),
         };
         let current_year = chrono::Utc::now().year();
         let row = sqlx::query(
@@ -184,6 +186,8 @@ impl Vote {
                 c.id,
                 ca.code,
                 ca.position,
+                ca.year,
+                ca.image_url,
                 p.name,
                 p.acronym,
                 p.id,
@@ -223,13 +227,15 @@ impl Vote {
                     "candidature": {
                         "code": row.get::<String, usize>(3),
                         "position": row.get::<String, usize>(4),
+                        "year": row.get::<i32, usize>(5),
+                        "image_url": row.get::<String, usize>(6),
                     },
                     "party": {
-                        "name": row.get::<String, usize>(5),
-                        "acronym": row.get::<String, usize>(6),
-                        "id": row.get::<String, usize>(7),
+                        "name": row.get::<String, usize>(7),
+                        "acronym": row.get::<String, usize>(8),
+                        "id": row.get::<String, usize>(9),
                     },
-                    "votes": row.get::<i64, usize>(8),
+                    "votes": row.get::<i64, usize>(10),
                 }
             );
 

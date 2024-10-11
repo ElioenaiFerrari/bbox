@@ -24,6 +24,7 @@ CREATE TABLE candidatures (
   id UUID PRIMARY KEY,
   party_id UUID REFERENCES parties(id),
   candidate_id UUID REFERENCES candidates(id),
+  image_url TEXT NOT NULL,
   code VARCHAR(10) NOT NULL,
   year INTEGER NOT NULL,
   position VARCHAR(20) NOT NULL,

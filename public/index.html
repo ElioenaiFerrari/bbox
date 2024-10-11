@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.0.0"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.2/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <div v-for="c in candidatures" :key="c.candidature.id">
+        <p>{{ c.candidate.first_name }}</p>
+        <p>{{ c.candidate.last_name }}</p>
+        <p>{{ c.candidature.position }}</p>
+      </div>
+
+      <select v-model="position" @change="getCandidatures">
+        <option v-for="position in availablePositions" :key="position">
+          {{ position }}
+        </option>
+      </select>
+    </div>
+  </body>
+  <script>
+    const app = Vue.createApp({
+      data() {
+        return {
+          message: 'Hello Vue 3',
+          ws: null,
+          candidatures: [],
+          position: '',
+          availablePositions: [
+            'Presidente',
+            'Vice-Presidente',
+            'Governador',
+            'Vice-Governador',
+            'Senador',
+            'Deputado Federal',
+            'Deputado Estadual',
+            'Prefeito',
+            'Vice-Prefeito',
+            'Vereador',
+            'Ministro',
+            'Secretário',
+          ],
+        };
+      },
+      beforeCreate() {
+        this.ws = new WebSocket('ws://localhost:4000/ws');
+
+        this.ws.onmessage = (event) => {
+          console.log(event.data);
+        };
+
+        this.ws.onopen = () => {
+          console.log('WebSocket connected');
+        };
+      },
+      methods: {
+        async getCandidatures() {
+          const response = await fetch(
+            `http://localhost:4000/api/v1/candidatures?position=${this.position}`
+          );
+          const data = await response.json();
+          this.candidatures = data;
+        },
+      },
+    });
+
+    app.mount('#app');
+  </script>
+</html>
