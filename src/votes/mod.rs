@@ -1,5 +1,6 @@
 use std::env;
 
+use anyhow::anyhow;
 use chrono::Datelike;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,8 @@ impl Vote {
         conn: &'a SqlitePool,
         voter_id: String,
         code: String,
-    ) -> Result<Self, sqlx::Error> {
+        candidature_position: CandidaturePosition,
+    ) -> Result<Self, anyhow::Error> {
         let row = sqlx::query(
             r#"
             SELECT
@@ -34,28 +36,30 @@ impl Vote {
                 party_id,
                 candidate_id,
                 code,
-                position
+                position,
+                year
             FROM
-                candidatures WHERE code = ?
+                candidatures WHERE code = ? AND
+                position = ?
             "#,
         )
         .bind(&code)
+        .bind(&candidature_position.to_string())
         .fetch_one(conn)
         .await;
 
         if let Err(reason) = row {
-            return Err(reason);
+            return Err(anyhow!("candidature not found: {}", reason));
         }
 
         let row = row?;
-        let position: String = row.get(4);
-        println!("position: {}", position);
         let candidature = Candidature {
             id: row.get(0),
             party_id: row.get(1),
             candidate_id: row.get(2),
             code: row.get(3),
-            position: CandidaturePosition::from(position),
+            position: candidature_position,
+            year: row.get(5),
         };
         let current_year = chrono::Utc::now().year();
         let row = sqlx::query(
@@ -82,17 +86,10 @@ impl Vote {
         .fetch_one(conn)
         .await;
 
-        if let Ok(row) = row {
-            return Ok(Vote {
-                id: row.get(0),
-                voter_id: row.get(1),
-                candidature_id: row.get(2),
-                candidature_position: CandidaturePosition::Councilor,
-                hash: row.get(3),
-                year: row.get(4),
-                previous_hash: row.get(5),
-                created_at: row.get(6),
-            });
+        if let Ok(_) = row {
+            return Err(anyhow!(
+                "voter already voted for this position in this year"
+            ));
         }
 
         // get last vote from database
@@ -170,23 +167,5 @@ impl Vote {
         .await?;
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use dotenv::dotenv;
-
-    fn setup() {
-        let _ = dotenv().ok();
-    }
-
-    #[test]
-    fn test_build() {
-        setup();
-        let voter_id = "voter_id".to_string();
-        let candidature_id = "candidature_id".to_string();
-        let previous_hash = "previous_hash".to_string();
     }
 }

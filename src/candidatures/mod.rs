@@ -1,8 +1,9 @@
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row, SqlitePool};
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CandidaturePosition {
     President,
     VicePresident,
@@ -63,6 +64,7 @@ pub struct Candidature {
     pub party_id: String,
     pub candidate_id: String,
     pub code: String,
+    pub year: i32,
     pub position: CandidaturePosition,
 }
 
@@ -73,19 +75,21 @@ impl Candidature {
         code: String,
         position: CandidaturePosition,
     ) -> Candidature {
+        let current_year = chrono::Local::now().year();
         Candidature {
             id: Uuid::now_v7().to_string(),
             party_id,
             candidate_id,
             code,
             position,
+            year: current_year,
         }
     }
     pub async fn create<'a>(&self, conn: &'a SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO candidatures (id, party_id, candidate_id, code, position)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO candidatures (id, party_id, candidate_id, code, position, year)
+            VALUES (?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&self.id)
@@ -93,13 +97,18 @@ impl Candidature {
         .bind(&self.candidate_id)
         .bind(&self.code)
         .bind(&self.position.to_string())
+        .bind(&self.year)
         .execute(conn)
         .await?;
 
         Ok(())
     }
 
-    pub async fn list<'a>(conn: &'a SqlitePool) -> Result<Vec<Candidature>, sqlx::Error> {
+    pub async fn list<'a>(
+        conn: &'a SqlitePool,
+        position: CandidaturePosition,
+    ) -> Result<Vec<Candidature>, sqlx::Error> {
+        let current_year = chrono::Local::now().year();
         let rows = sqlx::query(
             r#"
             SELECT
@@ -107,11 +116,17 @@ impl Candidature {
                 party_id,
                 candidate_id,
                 code,
-                position
+                position,
+                year
             FROM
                 candidatures
+            WHERE
+                position = ? AND
+                year = ?
             "#,
         )
+        .bind(position.to_string())
+        .bind(current_year)
         .fetch_all(conn)
         .await?;
 
@@ -125,6 +140,7 @@ impl Candidature {
                 candidate_id: row.get(2),
                 code: row.get(3),
                 position: CandidaturePosition::from(position),
+                year: row.get(5),
             };
             cs.push(c);
         }

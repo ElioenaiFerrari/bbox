@@ -1,10 +1,11 @@
 use actix_web::{
-    rt,
-    web::{self, Data},
+    get, rt,
+    web::{self, Data, Query},
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_ws::AggregatedMessage;
 use bbox::{Candidate, Candidature, CandidaturePosition, Party, Vote, Voter};
+use chrono::Datelike;
 use dotenv::dotenv;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -32,8 +33,27 @@ struct VoteRequest {
     pub voter_id: String,
     #[validate(length(min = 1))]
     pub candidature_code: String,
+    #[validate(length(min = 1))]
+    pub candidature_position: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+struct GetCandidatureQuery {
+    pub position: CandidaturePosition,
+}
+
+#[get("/candidatures")]
+async fn get_candidatures(
+    state: Data<State>,
+    query: Query<GetCandidatureQuery>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let candidatures = Candidature::list(&state.conn, query.position.clone())
+        .await
+        .unwrap();
+    Ok(HttpResponse::Ok().json(candidatures))
+}
+
+#[get("/ws")]
 async fn ws(
     req: HttpRequest,
     stream: web::Payload,
@@ -41,9 +61,9 @@ async fn ws(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
 
-    let candidatures = Candidature::list(&state.conn).await.unwrap();
-    let value = serde_json::to_string(&candidatures).unwrap();
-    session.text(value).await.unwrap();
+    // let candidatures = Candidature::list(&state.conn).await.unwrap();
+    // let value = serde_json::to_string(&candidatures).unwrap();
+    // session.text(value).await.unwrap();
 
     let mut stream = stream
         .aggregate_continuations()
@@ -56,7 +76,14 @@ async fn ws(
         while let Some(msg) = stream.next().await {
             match msg {
                 Ok(AggregatedMessage::Text(text)) => {
-                    let vote_request = serde_json::from_str::<VoteRequest>(&text).unwrap();
+                    let vote_request = match serde_json::from_str::<VoteRequest>(&text) {
+                        Ok(vote_request) => vote_request,
+                        Err(reason) => {
+                            session.text(reason.to_string()).await.unwrap();
+                            continue;
+                        }
+                    };
+
                     match vote_request.validate() {
                         Ok(_) => {}
                         Err(reason) => {
@@ -68,24 +95,24 @@ async fn ws(
                         &state.conn,
                         vote_request.voter_id,
                         vote_request.candidature_code,
+                        CandidaturePosition::from(vote_request.candidature_position),
                     )
                     .await
                     {
                         Ok(vote) => match vote.create(&state.conn).await {
                             Ok(_) => {
-                                println!("vote created");
+                                session.text("vote created".to_string()).await.unwrap();
                             }
                             Err(reason) => {
-                                println!("error on create vote: {}", reason);
+                                session.text(reason.to_string()).await.unwrap();
                                 continue;
                             }
                         },
                         Err(reason) => {
-                            println!("error on create vote: {}", reason);
+                            session.text(reason.to_string()).await.unwrap();
                             continue;
                         }
                     }
-                    session.text(text).await.unwrap();
                 }
 
                 Ok(AggregatedMessage::Binary(bin)) => {
@@ -154,6 +181,7 @@ async fn main() -> std::io::Result<()> {
         candidate_id: candidate.id,
         code: generate_random_string(8),
         position: CandidaturePosition::President,
+        year: chrono::Utc::now().year(),
     };
     if let Err(reason) = candidature.create(&conn).await {
         println!("error on create candidature: {}", reason);
@@ -183,7 +211,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(State { conn: conn.clone() }))
-            .route("/ws", web::get().to(ws))
+            .service(ws)
+            .service(web::scope("/api/v1").service(get_candidatures))
     })
     .bind(("0.0.0.0", 4000))?
     .run()

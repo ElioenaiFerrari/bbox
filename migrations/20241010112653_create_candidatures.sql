@@ -25,9 +25,10 @@ CREATE TABLE candidatures (
   party_id UUID REFERENCES parties(id),
   candidate_id UUID REFERENCES candidates(id),
   code VARCHAR(10) NOT NULL,
+  year INTEGER NOT NULL,
   position VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX idx_candidatures_code ON candidatures(code);
+CREATE UNIQUE INDEX idx_candidatures_year_code_position ON candidatures (year, code, position);
