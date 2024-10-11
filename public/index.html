@@ -49,7 +49,7 @@
           </thead>
           <tbody>
             <tr v-for="vote in votes" :key="vote.id">
-              <td class="border px-4 py-2">{{ vote.candidate.first_name }}</td>
+              <td class="border px-4 py-2">{{ `${vote.candidate.first_name} ${vote.candidate.last_name}` }}</td>
               <td class="border px-4 py-2">{{ vote.candidature.position }}</td>
               <td class="border px-4 py-2">{{ vote.votes }}</td>
             </tr>
@@ -122,7 +122,7 @@
               },
               body: JSON.stringify({
                 candidature_code: candidature.code,
-                voter_id: "01927cf7-573e-75b2-b270-845dc2a5faf4",
+                voter_id: "01927cfc-399d-7dc2-ad7d-f839a075e813",
                 candidature_position: candidature.position,
               }),
             });
