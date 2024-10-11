@@ -53,6 +53,22 @@ async fn get_candidatures(
     Ok(HttpResponse::Ok().json(candidatures))
 }
 
+#[derive(Debug, Deserialize)]
+struct VoteQuery {
+    pub candidature_position: CandidaturePosition,
+}
+
+#[get("/votes")]
+async fn get_votes(
+    state: Data<State>,
+    query: Query<VoteQuery>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let votes = Vote::list(&state.conn, query.candidature_position.clone())
+        .await
+        .unwrap();
+    Ok(HttpResponse::Ok().json(votes))
+}
+
 #[get("/ws")]
 async fn ws(
     req: HttpRequest,
@@ -212,7 +228,11 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(Data::new(State { conn: conn.clone() }))
             .service(ws)
-            .service(web::scope("/api/v1").service(get_candidatures))
+            .service(
+                web::scope("/api/v1")
+                    .service(get_candidatures)
+                    .service(get_votes),
+            )
     })
     .bind(("0.0.0.0", 4000))?
     .run()

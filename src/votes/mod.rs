@@ -1,9 +1,10 @@
-use std::env;
+use std::{collections::HashMap, env};
 
 use anyhow::anyhow;
 use chrono::Datelike;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sha2::Sha256;
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
@@ -167,5 +168,72 @@ impl Vote {
         .await?;
 
         Ok(())
+    }
+
+    // get group by candidate name and count votes
+    pub async fn list<'a>(
+        conn: &'a SqlitePool,
+        candidature_position: CandidaturePosition,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let current_year = chrono::Utc::now().year();
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                c.first_name,
+                c.last_name,
+                c.id,
+                ca.code,
+                ca.position,
+                p.name,
+                p.acronym,
+                p.id,
+                COUNT(v.id) as votes
+            FROM
+                votes v
+            JOIN
+                candidatures ca ON v.candidature_id = ca.id
+            JOIN
+                candidates c ON ca.candidate_id = c.id
+            JOIN
+                parties p ON ca.party_id = p.id
+            WHERE
+                v.candidature_position = ? AND
+                v.year = ?
+            GROUP BY
+                ca.id
+            "#,
+        )
+        .bind(candidature_position.to_string())
+        .bind(current_year)
+        .fetch_all(conn)
+        .await?;
+
+        let mut cs = Vec::new();
+
+        for row in rows {
+            let value = json!(
+                {
+                    "candidate": {
+                        "first_name": row.get::<String, usize>(0),
+                        "last_name": row.get::<String, usize>(1),
+                        "id": row.get::<String, usize>(2),
+                    },
+                    "candidature": {
+                        "code": row.get::<String, usize>(3),
+                        "position": row.get::<String, usize>(4),
+                    },
+                    "party": {
+                        "name": row.get::<String, usize>(5),
+                        "acronym": row.get::<String, usize>(6),
+                        "id": row.get::<String, usize>(7),
+                    },
+                    "votes": row.get::<i64, usize>(8),
+                }
+            );
+
+            cs.push(value);
+        }
+
+        Ok(cs)
     }
 }
