@@ -4,7 +4,6 @@ use actix_web::{
     web::{self, Data, Query},
     App, HttpRequest, HttpResponse, HttpServer,
 };
-use actix_ws::AggregatedMessage;
 use bbox::{Candidate, Candidature, CandidaturePosition, Party, Vote, Voter};
 use chrono::Datelike;
 use dotenv::dotenv;
@@ -13,7 +12,6 @@ use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::SqlitePool;
-use tokio_stream::StreamExt;
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
