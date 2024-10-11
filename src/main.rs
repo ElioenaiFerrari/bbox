@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{
-    get, rt,
+    get, post, rt,
     web::{self, Data, Query},
     App, HttpRequest, HttpResponse, HttpServer,
 };
@@ -11,6 +11,7 @@ use dotenv::dotenv;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
+use serde_json::json;
 use sqlx::SqlitePool;
 use tokio_stream::StreamExt;
 use uuid::Uuid;
@@ -70,11 +71,45 @@ async fn get_votes(
     Ok(HttpResponse::Ok().json(votes))
 }
 
+#[post("/votes")]
+async fn create_vote(
+    state: Data<State>,
+    vote_request: web::Json<VoteRequest>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match vote_request.validate() {
+        Ok(_) => {}
+        Err(reason) => {
+            return Ok(HttpResponse::BadRequest().json(json!({
+                "message": reason.to_string(),
+            })));
+        }
+    }
+    let vote = Vote::build(
+        &state.conn,
+        vote_request.voter_id.clone(),
+        vote_request.candidature_code.clone(),
+        CandidaturePosition::from(vote_request.candidature_position.clone()),
+    )
+    .await;
+    match vote {
+        Ok(vote) => match vote.create(&state.conn).await {
+            Ok(_) => Ok(HttpResponse::Ok().json(vote)),
+            Err(reason) => Ok(HttpResponse::BadRequest().json(json!({
+                "message": reason.to_string(),
+            }))),
+        },
+        Err(reason) => Ok(HttpResponse::BadRequest().json(json!({
+            "message": reason.to_string(),
+        }))),
+    }
+}
+
 #[get("/ws")]
 async fn ws(
     req: HttpRequest,
     stream: web::Payload,
     state: Data<State>,
+    query: Query<VoteQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
 
@@ -82,68 +117,22 @@ async fn ws(
     // let value = serde_json::to_string(&candidatures).unwrap();
     // session.text(value).await.unwrap();
 
-    let mut stream = stream
-        .aggregate_continuations()
-        // aggregate continuation frames up to 1MiB
-        .max_continuation_size(2_usize.pow(20));
+    // let mut stream = stream
+    //     .aggregate_continuations()
+    //     // aggregate continuation frames up to 1MiB
+    //     .max_continuation_size(2_usize.pow(20));
 
     // start task but don't wait for it
     rt::spawn(async move {
         // receive messages from websocket
-        while let Some(msg) = stream.next().await {
-            match msg {
-                Ok(AggregatedMessage::Text(text)) => {
-                    let vote_request = match serde_json::from_str::<VoteRequest>(&text) {
-                        Ok(vote_request) => vote_request,
-                        Err(reason) => {
-                            session.text(reason.to_string()).await.unwrap();
-                            continue;
-                        }
-                    };
+        loop {
+            let votes = Vote::list(&state.conn, query.candidature_position.clone())
+                .await
+                .unwrap();
 
-                    match vote_request.validate() {
-                        Ok(_) => {}
-                        Err(reason) => {
-                            session.text(reason.to_string()).await.unwrap();
-                            continue;
-                        }
-                    }
-                    match Vote::build(
-                        &state.conn,
-                        vote_request.voter_id,
-                        vote_request.candidature_code,
-                        CandidaturePosition::from(vote_request.candidature_position),
-                    )
-                    .await
-                    {
-                        Ok(vote) => match vote.create(&state.conn).await {
-                            Ok(_) => {
-                                session.text("vote created".to_string()).await.unwrap();
-                            }
-                            Err(reason) => {
-                                session.text(reason.to_string()).await.unwrap();
-                                continue;
-                            }
-                        },
-                        Err(reason) => {
-                            session.text(reason.to_string()).await.unwrap();
-                            continue;
-                        }
-                    }
-                }
-
-                Ok(AggregatedMessage::Binary(bin)) => {
-                    // echo binary message
-                    session.binary(bin).await.unwrap();
-                }
-
-                Ok(AggregatedMessage::Ping(msg)) => {
-                    // respond to PING frame with PONG frame
-                    session.pong(&msg).await.unwrap();
-                }
-
-                _ => {}
-            }
+            let value = serde_json::to_string(&votes).unwrap();
+            session.text(value).await.unwrap();
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     });
 
@@ -273,7 +262,8 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api/v1")
                     .service(get_candidatures)
-                    .service(get_votes),
+                    .service(get_votes)
+                    .service(create_vote),
             )
     })
     .bind(("0.0.0.0", 4000))?
