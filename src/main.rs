@@ -91,7 +91,7 @@ async fn create_vote(
     .await;
     match vote {
         Ok(vote) => match vote.create(&state.conn).await {
-            Ok(_) => Ok(HttpResponse::Ok().json(vote)),
+            Ok(_) => Ok(HttpResponse::Created().json(vote)),
             Err(reason) => Ok(HttpResponse::BadRequest().json(json!({
                 "message": reason.to_string(),
             }))),
