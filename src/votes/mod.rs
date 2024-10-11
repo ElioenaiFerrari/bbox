@@ -201,6 +201,8 @@ impl Vote {
                 v.year = ?
             GROUP BY
                 ca.id
+            ORDER BY
+                votes DESC
             "#,
         )
         .bind(candidature_position.to_string())
