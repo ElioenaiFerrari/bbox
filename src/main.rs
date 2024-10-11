@@ -117,14 +117,15 @@ async fn ws(
     // let value = serde_json::to_string(&candidatures).unwrap();
     // session.text(value).await.unwrap();
 
-    // let mut stream = stream
-    //     .aggregate_continuations()
-    //     // aggregate continuation frames up to 1MiB
-    //     .max_continuation_size(2_usize.pow(20));
+    let mut stream = stream
+        .aggregate_continuations()
+        // aggregate continuation frames up to 1MiB
+        .max_continuation_size(2_usize.pow(20));
 
     // start task but don't wait for it
     rt::spawn(async move {
         // receive messages from websocket
+
         loop {
             let votes = Vote::list(&state.conn, query.candidature_position.clone())
                 .await
