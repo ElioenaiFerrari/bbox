@@ -104,8 +104,8 @@ impl Candidature {
     pub async fn create<'a>(&self, conn: &'a SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO candidatures (id, party_id, candidate_id, code, position, year)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO candidatures (id, party_id, candidate_id, code, position, year, image_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&self.id)
@@ -114,6 +114,7 @@ impl Candidature {
         .bind(&self.code)
         .bind(&self.position.to_string())
         .bind(&self.year)
+        .bind(&self.image_url)
         .execute(conn)
         .await?;
 
